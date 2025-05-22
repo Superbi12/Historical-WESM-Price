@@ -1,15 +1,10 @@
 let rawData = [];
 let chart;
 
-// Load JSON data
 async function loadData() {
   const response = await fetch('data.json');
   rawData = await response.json();
-
-  rawData.forEach(d => {
-    d.datetime = new Date(d['Date and Time']);
-  });
-
+  rawData.forEach(d => d.datetime = new Date(d['Date and Time']));
   rawData.sort((a, b) => a.datetime - b.datetime);
   return rawData;
 }
@@ -34,79 +29,51 @@ function groupByInterval(data, interval) {
   const grouped = [];
 
   if (interval === '5min') {
-    // Each entry is already 5-minutely, just return raw
-    return data.map(d => ({
-      label: d.datetime,
-      price1: d.BOTOLAN,
-      price2: d.OLONGAPO
-    }));
+    return data.map(d => ({ label: d.datetime, price1: d.BOTOLAN, price2: d.OLONGAPO }));
   }
 
   if (interval === 'hourly') {
     const hourlyMap = {};
-
     data.forEach(d => {
       const key = d.datetime.getFullYear() + '-' +
                   (d.datetime.getMonth() + 1).toString().padStart(2, '0') + '-' +
                   d.datetime.getDate().toString().padStart(2, '0') + ' ' +
                   d.datetime.getHours().toString().padStart(2, '0');
-
       if (!hourlyMap[key]) hourlyMap[key] = { sum1: 0, sum2: 0, count: 0 };
-
       hourlyMap[key].sum1 += d.BOTOLAN;
       hourlyMap[key].sum2 += d.OLONGAPO;
       hourlyMap[key].count++;
     });
-
     for (const key in hourlyMap) {
       const avgPrice1 = hourlyMap[key].sum1 / hourlyMap[key].count;
       const avgPrice2 = hourlyMap[key].sum2 / hourlyMap[key].count;
-
       const [datePart, hourPart] = key.split(' ');
       const [year, month, day] = datePart.split('-');
       const hour = parseInt(hourPart);
-
       const labelTime = new Date(year, month - 1, day, hour);
-
-      grouped.push({
-        label: labelTime,
-        price1: avgPrice1,
-        price2: avgPrice2
-      });
+      grouped.push({ label: labelTime, price1: avgPrice1, price2: avgPrice2 });
     }
-
     return grouped.sort((a, b) => a.label - b.label);
   }
 
   if (interval === 'daily') {
     const dailyMap = {};
-
     data.forEach(d => {
       const key = d.datetime.getFullYear() + '-' +
                   (d.datetime.getMonth() + 1).toString().padStart(2, '0') + '-' +
                   d.datetime.getDate().toString().padStart(2, '0');
-
       if (!dailyMap[key]) dailyMap[key] = { sum1: 0, sum2: 0, count: 0 };
-
       dailyMap[key].sum1 += d.BOTOLAN;
       dailyMap[key].sum2 += d.OLONGAPO;
       dailyMap[key].count++;
     });
-
     for (const key in dailyMap) {
       const avgPrice1 = dailyMap[key].sum1 / dailyMap[key].count;
       const avgPrice2 = dailyMap[key].sum2 / dailyMap[key].count;
-
       const [year, month, day] = key.split('-');
-      const labelTime = new Date(year, month - 1, day); // JS months are 0-indexed
-
-      grouped.push({
-        label: labelTime,
-        price1: avgPrice1,
-        price2: avgPrice2
-      });
+      const labelTime = new Date(year, month - 1, day);
+      grouped.push({ label: labelTime, price1: avgPrice1, price2: avgPrice2 });
     }
-
     return grouped.sort((a, b) => a.label - b.label);
   }
 
@@ -115,7 +82,6 @@ function groupByInterval(data, interval) {
 
 function drawChart(data) {
   const ctx = document.getElementById('priceChart').getContext('2d');
-
   const labels = data.map(d => d.label.toLocaleString());
   const price1 = data.map(d => d.price1);
   const price2 = data.map(d => d.price2);
@@ -134,7 +100,8 @@ function drawChart(data) {
           backgroundColor: 'rgba(52,152,219,0.1)',
           fill: true,
           tension: 0.3,
-          pointRadius: 2
+          pointRadius: 2,
+          hidden: false
         },
         {
           label: 'OLONGAPO',
@@ -143,38 +110,21 @@ function drawChart(data) {
           backgroundColor: 'rgba(46,204,113,0.1)',
           fill: true,
           tension: 0.3,
-          pointRadius: 2
+          pointRadius: 2,
+          hidden: false
         }
       ]
     },
     options: {
-      responsive: true,
+      responsive: false,
       maintainAspectRatio: false,
       interaction: {
         mode: 'index',
         intersect: false
       },
       plugins: {
-        title: {
-          display: true,
-          text: 'Market Prices Over Time',
-          font: { size: 18 }
-        },
-        legend: { position: 'top' },
-        zoom: {
-          pan: {
-            enabled: true,
-            mode: 'x',
-            modifierKey: 'ctrl' // Hold CTRL + Drag to pan
-          },
-          zoom: {
-            wheel: { enabled: true },
-            pinch: { enabled: true },
-            mode: 'x'
-          },
-          limits: {
-            x: { minRange: 1 }
-          }
+        legend: {
+          display: false // disable built-in legend
         }
       },
       scales: {
@@ -183,7 +133,7 @@ function drawChart(data) {
             maxRotation: 45,
             minRotation: 45,
             autoSkip: true,
-            maxTicksLimit: 30
+            maxTicksLimit: 100
           }
         },
         y: {
@@ -193,16 +143,15 @@ function drawChart(data) {
     }
   });
 
-  updateTable(data); // Mirror chart data in the table
+  updateTable(data);
+  setupInteractiveLegend(); // Call custom legend toggle
 }
 
 function updateTable(data) {
   const tableBody = document.querySelector('#dataTable tbody');
   tableBody.innerHTML = '';
-
   data.forEach(row => {
     const tr = document.createElement('tr');
-
     const dateCell = document.createElement('td');
     dateCell.textContent = row.label.toLocaleString();
     tr.appendChild(dateCell);
@@ -221,13 +170,30 @@ function updateTable(data) {
   });
 }
 
+function setupInteractiveLegend() {
+  const legend = document.querySelector('.legend-custom');
+  legend.innerHTML = `
+    <span id="legend-botolan" style="color: #3498db; font-weight: bold; cursor: pointer;">⬤ BOTOLAN</span>
+    &nbsp;&nbsp;
+    <span id="legend-olongapo" style="color: #2ecc71; font-weight: bold; cursor: pointer;">⬤ OLONGAPO</span>
+  `;
+
+  document.getElementById('legend-botolan').addEventListener('click', () => {
+    chart.data.datasets[0].hidden = !chart.data.datasets[0].hidden;
+    chart.update();
+  });
+
+  document.getElementById('legend-olongapo').addEventListener('click', () => {
+    chart.data.datasets[1].hidden = !chart.data.datasets[1].hidden;
+    chart.update();
+  });
+}
+
 function updateChart() {
   const selectedMonth = document.getElementById('monthFilter').value;
   const selectedInterval = document.getElementById('intervalFilter').value;
-
   const filtered = filterByMonth(rawData, selectedMonth);
   const grouped = groupByInterval(filtered, selectedInterval);
-
   drawChart(grouped);
 }
 
@@ -240,20 +206,16 @@ document.getElementById('downloadChart').addEventListener('click', () => {
 
 async function init() {
   await loadData();
-
   const monthFilter = document.getElementById('monthFilter');
   const months = getUniqueBillingMonths(rawData);
-
   months.forEach(month => {
     const option = document.createElement('option');
     option.value = month;
     option.textContent = month;
     monthFilter.appendChild(option);
   });
-
   monthFilter.addEventListener('change', updateChart);
   document.getElementById('intervalFilter').addEventListener('change', updateChart);
-
   updateChart();
 }
 
