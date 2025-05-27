@@ -2,98 +2,104 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Market Price Visualizer</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Market Prices Over Time</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <script src="lib/papaparse.min.js"></script>
   <style>
-    body {
-      padding: 30px;
-      background-color: #f8f9fa;
-      font-family: Arial, sans-serif;
-    }
-
-    h1 {
-      text-align: center;
-      margin-bottom: 10px;
-    }
-
-    .legend-custom {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    .legend-custom span {
-      font-weight: bold;
-    }
-
-    .chart-scroll-wrapper {
-      overflow-x: auto;
-    }
-
-    .chart-inner {
-      width: 3000px;
+    .container {
+      max-width: 95%;
       margin: 0 auto;
+      padding: 20px;
+      text-align: center; /* Center all content */
     }
-
-    canvas {
-      display: block;
+    .title {
+      font-size: 2.5em;
+      margin: 20px 0;
+      color: #333;
     }
-
+    .legend-custom {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin: 20px 0;
+    }
+    .legend-custom span {
+      font-size: 1.2em;
+      cursor: pointer;
+    }
+    #priceChart {
+      width: 100% !important;
+      height: 60vh !important; /* Use viewport height for responsiveness */
+      max-height: 600px; /* Cap max height for very large screens */
+    }
+    .filter-group {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+      margin: 20px 0;
+    }
+    select, button {
+      padding: 8px;
+      font-size: 1em;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
     table {
-      font-size: 14px;
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
     }
-
     th, td {
-      text-align: center;
-      vertical-align: middle;
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
     }
-
-    .table-container {
-      overflow-x: auto;
+    th {
+      background-color: #f2f2f2;
+    }
+    td:nth-child(2), td:nth-child(3) {
+      text-align: center;
     }
   </style>
 </head>
 <body>
-
-  <h1>Market Prices Over Time</h1>
-
-  <div class="legend-custom">
-    <span style="color: #3498db;">⬤ BOTOLAN</span> &nbsp;&nbsp;
-    <span style="color: #2ecc71;">⬤ OLONGAPO</span>
-  </div>
-
-  <div class="controls d-flex justify-content-center flex-wrap gap-3 mb-4">
-  <div class="d-flex align-items-center gap-2">
-    <label for="monthFilter" class="form-label mb-0">Billing Month:</label>
-    <select id="monthFilter" class="form-select w-auto">
-      <option value="All">All</option>
-    </select>
-  </div>
-
-  <div class="d-flex align-items-center gap-2">
-    <label for="intervalFilter" class="form-label mb-0">Interval:</label>
-    <select id="intervalFilter" class="form-select w-auto">
-      <option value="5min">5 Minutes</option>
-      <option value="hourly">Hourly</option>
-      <option value="daily" selected>Daily</option>
-    </select>
-  </div>
-
-  <button id="downloadChart" class="btn btn-primary">Download Chart</button>
-</div>
-
-
-  <div class="chart-scroll-wrapper">
-    <div class="chart-inner">
-      <canvas id="priceChart" height="500" width="3000"></canvas>
+  <div class="container">
+    <h1 class="title">Market Prices Over Time</h1>
+    <div class="legend-custom">
+      <span id="legend-botolan" style="color: #3498db; font-weight: bold;">⬤ BOTOLAN</span>
+      <span id="legend-olongapo" style="color: #2ecc71; font-weight: bold;">⬤ OLONGAPO</span>
     </div>
-  </div>
-
-  <div class="table-container mt-4">
-    <table id="dataTable" class="table table-striped table-bordered">
-      <thead class="table-dark">
+    <div class="filter-group">
+      <label for="yearFilter">Year:</label>
+      <select id="yearFilter">
+        <option value="All">All</option>
+      </select>
+      <label for="monthFilter">Billing Month:</label>
+      <select id="monthFilter">
+        <option value="All">All</option>
+      </select>
+      <label for="intervalFilter">Interval:</label>
+      <select id="intervalFilter">
+        <option value="5min">5 Minutes</option>
+        <option value="hourly">Hourly</option>
+        <option value="daily">Daily</option>
+      </select>
+    </div>
+    <button id="downloadChart">Download Chart</button>
+    <canvas id="priceChart"></canvas>
+    <table id="dataTable">
+      <thead>
         <tr>
           <th>Date & Time</th>
           <th>BOTOLAN (₱/kWh)</th>
@@ -103,7 +109,6 @@
       <tbody></tbody>
     </table>
   </div>
-
   <script src="script.js"></script>
 </body>
 </html>
