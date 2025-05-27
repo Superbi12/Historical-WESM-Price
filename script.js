@@ -14,6 +14,23 @@ async function loadData(year, month) {
     throw new Error('Papa Parse library not loaded. Please check the script inclusion in index.html.');
   }
 
+  const selectedInterval = document.getElementById('intervalFilter').value;
+
+  // Function to get date range for a billing month
+  function getBillingMonthRange(year, month) {
+    const monthIndex = month === 'All' ? 0 : ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].indexOf(month);
+    let startDate, endDate;
+    if (year === '2023' && month === 'December') {
+      startDate = new Date(2023, 10, 26); // 11/26/2023
+      endDate = new Date(2023, 11, 25, 23, 59, 59); // 12/25/2023
+    } else {
+      const yearNum = parseInt(year);
+      startDate = new Date(yearNum, monthIndex - 1, 26); // 26th of previous month
+      endDate = new Date(yearNum, monthIndex, 25, 23, 59, 59); // 25th of current month
+    }
+    return { startDate, endDate };
+  }
+
   if (year === 'All') {
     let allData = [];
     for (const y of Object.keys(yearMonths)) {
@@ -28,7 +45,7 @@ async function loadData(year, month) {
               error: (error) => reject(error)
             });
           });
-          console.log(`Loaded ${file}: ${data.length} rows`); // Debug log
+          console.log(`Loaded ${file}: ${data.length} rows`);
           if (!data || data.length === 0) {
             console.warn(`No data in ${file}`);
           }
@@ -47,9 +64,13 @@ async function loadData(year, month) {
       d.BOTOLAN = parseFloat(d.BOTOLAN) || 0;
       d.OLONGAPO = parseFloat(d.OLONGAPO) || 0;
     });
-    allData = allData.filter(d => d.datetime && !isNaN(d.datetime.getTime())); // Remove invalid rows
+    allData = allData.filter(d => d.datetime && !isNaN(d.datetime.getTime()));
+    if (selectedInterval === 'daily' && month !== 'All') {
+      const { startDate, endDate } = getBillingMonthRange(year, month);
+      allData = allData.filter(d => d.datetime >= startDate && d.datetime <= endDate);
+    }
     allData.sort((a, b) => a.datetime - b.datetime);
-    console.log(`Total valid rows after processing: ${allData.length}`); // Debug log
+    console.log(`Total valid rows after processing: ${allData.length}`);
     return allData;
   } else if (month === 'All') {
     let allData = [];
@@ -64,7 +85,7 @@ async function loadData(year, month) {
             error: (error) => reject(error)
           });
         });
-        console.log(`Loaded ${file}: ${data.length} rows`); // Debug log
+        console.log(`Loaded ${file}: ${data.length} rows`);
         if (!data || data.length === 0) {
           console.warn(`No data in ${file}`);
         }
@@ -82,9 +103,13 @@ async function loadData(year, month) {
       d.BOTOLAN = parseFloat(d.BOTOLAN) || 0;
       d.OLONGAPO = parseFloat(d.OLONGAPO) || 0;
     });
-    allData = allData.filter(d => d.datetime && !isNaN(d.datetime.getTime())); // Remove invalid rows
+    allData = allData.filter(d => d.datetime && !isNaN(d.datetime.getTime()));
+    if (selectedInterval === 'daily') {
+      const yearData = allData.filter(d => d.datetime.getFullYear() === parseInt(year));
+      allData = yearData; // Limit to selected year for daily interval
+    }
     allData.sort((a, b) => a.datetime - b.datetime);
-    console.log(`Total valid rows for year ${year}: ${allData.length}`); // Debug log
+    console.log(`Total valid rows for year ${year}: ${allData.length}`);
     return allData;
   } else {
     const file = `data/${year}_${month.toLowerCase()}.csv`;
@@ -97,7 +122,7 @@ async function loadData(year, month) {
           error: (error) => reject(error)
         });
       });
-      console.log(`Loaded ${file}: ${data.length} rows`); // Debug log
+      console.log(`Loaded ${file}: ${data.length} rows`);
       if (!data || data.length === 0) {
         console.warn(`No data in ${file}`);
         return [];
@@ -107,12 +132,13 @@ async function loadData(year, month) {
         d.BOTOLAN = parseFloat(d.BOTOLAN) || 0;
         d.OLONGAPO = parseFloat(d.OLONGAPO) || 0;
       });
-      const validData = data.filter(d => d.datetime && !isNaN(d.datetime.getTime())); // Remove invalid rows
-      validData.sort((a, b) => a.datetime - b.datetime);
-      console.log(`Valid rows for ${file}: ${validData.length}`); // Debug log
-      if (validData.length === 0) {
-        return [];
+      let validData = data.filter(d => d.datetime && !isNaN(d.datetime.getTime()));
+      if (selectedInterval === 'daily') {
+        const { startDate, endDate } = getBillingMonthRange(year, month);
+        validData = validData.filter(d => d.datetime >= startDate && d.datetime <= endDate);
       }
+      validData.sort((a, b) => a.datetime - b.datetime);
+      console.log(`Valid rows for ${file}: ${validData.length}`);
       return validData;
     } catch (error) {
       console.error(`Error loading ${file}:`, error);
@@ -133,7 +159,6 @@ function updateMonthFilter(year, selectedMonth = 'All') {
       monthFilter.appendChild(option);
     });
   }
-  // Set the month filter to the selected month, if valid
   if (yearMonths[year] && yearMonths[year].includes(selectedMonth)) {
     monthFilter.value = selectedMonth;
   } else {
@@ -192,10 +217,10 @@ function groupByInterval(data, interval) {
       const avgPrice1 = dailyMap[key].sum1 / dailyMap[key].count;
       const avgPrice2 = dailyMap[key].sum2 / dailyMap[key].count;
       const [year, month, day] = key.split('-');
-      const labelTime = new Date(year, month - 1, day);
-      grouped.push({ label: labelTime, price1: avgPrice1, price2: avgPrice2 });
+      const formattedLabel = `${month}/${day}/${year}`; // MM/DD/YYYY
+      grouped.push({ label: formattedLabel, price1: avgPrice1, price2: avgPrice2 });
     }
-    return grouped.sort((a, b) => a.label - b.label);
+    return grouped.sort((a, b) => new Date(a.label) - new Date(b.label));
   }
 
   return grouped;
@@ -203,9 +228,10 @@ function groupByInterval(data, interval) {
 
 function drawChart(data) {
   const ctx = document.getElementById('priceChart').getContext('2d');
-  const labels = data.map(d => d.label.toLocaleString());
+  const labels = data.map(d => d.label);
   const price1 = data.map(d => d.price1);
   const price2 = data.map(d => d.price2);
+  const selectedInterval = document.getElementById('intervalFilter').value;
 
   if (chart) chart.destroy();
 
@@ -254,7 +280,14 @@ function drawChart(data) {
             maxRotation: 45,
             minRotation: 45,
             autoSkip: true,
-            maxTicksLimit: 100
+            maxTicksLimit: 100,
+            callback: function(value, index, values) {
+              if (selectedInterval === 'daily') {
+                return labels[index]; // Use MM/DD/YYYY format
+              } else {
+                return new Date(labels[index]).toLocaleString(); // Full datetime for 5min/hourly
+              }
+            }
           }
         },
         y: {
@@ -270,11 +303,11 @@ function drawChart(data) {
 
 function updateTable(data, append = false) {
   const tableBody = document.querySelector('#dataTable tbody');
+  const selectedInterval = document.getElementById('intervalFilter').value;
   if (!append) {
     tableBody.innerHTML = '';
     displayedRows = 100; // Reset displayed rows
   } else {
-    // Remove existing "Load More" button
     const existingMoreRow = tableBody.querySelector('tr:last-child');
     if (existingMoreRow && existingMoreRow.querySelector('button')) {
       tableBody.removeChild(existingMoreRow);
@@ -288,7 +321,7 @@ function updateTable(data, append = false) {
   rowsToShow.forEach(row => {
     const tr = document.createElement('tr');
     const dateCell = document.createElement('td');
-    dateCell.textContent = row.label.toLocaleString();
+    dateCell.textContent = selectedInterval === 'daily' ? row.label : row.label.toLocaleString();
     tr.appendChild(dateCell);
     const price1Cell = document.createElement('td');
     price1Cell.textContent = row.price1.toFixed(2);
@@ -315,7 +348,7 @@ function updateTable(data, append = false) {
     loadMoreButton.style.cursor = 'pointer';
     loadMoreButton.addEventListener('click', () => {
       displayedRows += 100;
-      updateTable(data, true); // Append more rows
+      updateTable(data, true);
     });
     moreCell.appendChild(loadMoreButton);
     moreRow.appendChild(moreCell);
@@ -352,9 +385,8 @@ function updateChart() {
   let selectedMonth = document.getElementById('monthFilter').value;
   const selectedInterval = document.getElementById('intervalFilter').value;
 
-  // Validate year-month combination
   if (selectedYear !== 'All' && selectedMonth !== 'All' && (!yearMonths[selectedYear] || !yearMonths[selectedYear].includes(selectedMonth))) {
-    selectedMonth = 'All'; // Reset to 'All' if invalid
+    selectedMonth = 'All';
     document.getElementById('monthFilter').value = 'All';
   }
 
@@ -364,20 +396,20 @@ function updateChart() {
     rawData = data;
     const filtered = filterByMonth(rawData, selectedMonth);
     const grouped = groupByInterval(filtered, selectedInterval);
-    if (chart) chart.destroy(); // Clear chart if no data
+    if (chart) chart.destroy();
     if (grouped.length === 0) {
       const tableBody = document.querySelector('#dataTable tbody');
       tableBody.innerHTML = `<tr><td colspan="3" style="text-align: center;">No data available for ${selectedMonth} ${selectedYear}.</td></tr>`;
     } else {
       drawChart(grouped);
     }
-    updateMonthFilter(selectedYear, selectedMonth); // Update month filter after data load
+    updateMonthFilter(selectedYear, selectedMonth);
   }).catch(error => {
     showLoading(false);
     console.error('Error updating chart:', error);
     const tableBody = document.querySelector('#dataTable tbody');
     tableBody.innerHTML = `<tr><td colspan="3" style="text-align: center;">No data available for ${selectedMonth} ${selectedYear}.</td></tr>`;
-    if (chart) chart.destroy(); // Clear chart on error
+    if (chart) chart.destroy();
   });
 }
 
@@ -397,7 +429,6 @@ function initializeFilters() {
   const monthFilter = document.getElementById('monthFilter');
   const intervalFilter = document.getElementById('intervalFilter');
 
-  // Populate year filter
   Object.keys(yearMonths).sort().forEach(year => {
     const option = document.createElement('option');
     option.value = year;
@@ -405,10 +436,9 @@ function initializeFilters() {
     yearFilter.appendChild(option);
   });
 
-  // Set default filter values
   yearFilter.value = '2025';
   intervalFilter.value = 'daily';
-  updateMonthFilter('2025', 'January'); // Populate month filter for 2025 with January
+  updateMonthFilter('2025', 'January');
   monthFilter.value = 'January';
 
   yearFilter.addEventListener('change', updateChart);
