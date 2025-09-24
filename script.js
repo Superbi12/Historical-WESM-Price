@@ -6,7 +6,7 @@ let displayedRows = 100; // Track number of displayed rows
 const yearMonths = {
   '2023': ['December'],
   '2024': ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-  '2025': ['January', 'February', 'March', 'April']
+  '2025': ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August']
 };
 
 async function loadData(year, month) {
